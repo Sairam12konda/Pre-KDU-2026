@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pomodoro Task Timer</title>
+
+  <style>
+    :root {
+      --bg-black: #0b0f14;
+      --deep-black: #070a0f;
+      --blue: #3b82f6;
+      --red: #ff3b3b;
+      --soft-white: #eaeaea;
+      --muted: #8b9bb4;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Inter", system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background: radial-gradient(circle at top, #101622, var(--bg-black));
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--soft-white);
+    }
+
+    .timer-container {
+      background: linear-gradient(145deg, #0f1523, var(--deep-black));
+      border-radius: 26px;
+      padding: 42px;
+      width: 380px;
+      text-align: center;
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.75);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 280px;
+      height: 280px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: conic-gradient(
+        var(--blue) 0deg,
+        rgba(59, 130, 246, 0.12) 0deg
+      );
+      opacity: 0.18;
+      transition: background 1s linear;
+    }
+
+    .progress-ring.running {
+      animation: breathe 3s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%, 100% { box-shadow: 0 0 0 rgba(59,130,246,0); }
+      50% { box-shadow: 0 0 30px rgba(59,130,246,0.25); }
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .time-display {
+      font-size: 68px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 24px;
+      transition: transform 0.15s ease;
+    }
+
+    .time-display.tick {
+      transform: scale(1.015);
+    }
+
+    .controls {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      margin-bottom: 26px;
+    }
+
+    /* 🔹 MORE ROUNDED BUTTONS */
+    button {
+      padding: 12px 22px;
+      border-radius: 999px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      font-weight: 600;
+    }
+
+    .start {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .pause {
+      background: #1c2433;
+      color: var(--soft-white);
+    }
+
+    .reset {
+      background: var(--red);
+      color: #fff;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      opacity: 0.95;
+    }
+
+    .custom-panel {
+      margin-top: 22px;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(59, 130, 246, 0.05);
+      border: 1px solid rgba(59, 130, 246, 0.12);
+      transition: opacity 0.4s ease;
+    }
+
+    .custom-panel.dim {
+      opacity: 0.45;
+    }
+
+    .custom-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .custom-controls input {
+      width: 78px;
+      padding: 10px;
+      font-size: 15px;
+      border-radius: 14px;
+      background: #0e1624;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      text-align: center;
+    }
+
+    .custom-controls input::placeholder {
+      color: #6f7f99;
+    }
+
+    .custom-controls input:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    }
+
+    .set {
+      padding: 10px 20px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #ffffff;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .set::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.25);
+      opacity: 0;
+    }
+
+    .set.pulse::after {
+      animation: pulse 0.4s ease-out;
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.4; }
+      to { opacity: 0; }
+    }
+
+    .sessions {
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 18px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="timer-container">
+    <div class="progress-ring" id="progressRing"></div>
+
+    <div class="content">
+      <div class="time-display" id="timer">25:00</div>
+
+      <div class="controls">
+        <button class="start" onclick="startTimer()">Start</button>
+        <button class="pause" onclick="pauseTimer()">Pause</button>
+        <button class="reset" onclick="resetTimer()">Reset</button>
+      </div>
+
+      <div class="custom-panel" id="customPanel">
+        <div class="custom-controls">
+          <input type="number" id="minutesInput" placeholder="min" min="1" max="60" />
+          <button class="set" id="goBtn" onclick="setCustomTimer()">GO</button>
+        </div>
+      </div>
+
+      <div class="sessions">
+        Sessions Completed: <span id="sessions">0</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let baseDurationSeconds = 25 * 60;
+    let remainingSeconds = baseDurationSeconds;
+    let interval = null;
+    let sessionsCompleted = 0;
+
+    const timerDisplay = document.getElementById("timer");
+    const progressRing = document.getElementById("progressRing");
+    const sessionsDisplay = document.getElementById("sessions");
+    const customPanel = document.getElementById("customPanel");
+    const goBtn = document.getElementById("goBtn");
+
+    function updateDisplay() {
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+
+      timerDisplay.textContent =
+        String(minutes).padStart(2, "0") +
+        ":" +
+        String(seconds).padStart(2, "0");
+
+      timerDisplay.classList.add("tick");
+      setTimeout(() => timerDisplay.classList.remove("tick"), 150);
+
+      const progress =
+        ((baseDurationSeconds - remainingSeconds) / baseDurationSeconds) * 360;
+
+      progressRing.style.background = `conic-gradient(
+        #3b82f6 ${progress}deg,
+        rgba(59, 130, 246, 0.12) ${progress}deg
+      )`;
+    }
+
+    function startTimer() {
+      if (interval) return;
+
+      progressRing.classList.add("running");
+      customPanel.classList.add("dim");
+
+      interval = setInterval(() => {
+        remainingSeconds--;
+        updateDisplay();
+
+        if (remainingSeconds <= 0) {
+          clearInterval(interval);
+          interval = null;
+          progressRing.classList.remove("running");
+          customPanel.classList.remove("dim");
+
+          sessionsCompleted++;
+          sessionsDisplay.textContent = sessionsCompleted;
+
+          alert("Session Complete!");
+          remainingSeconds = baseDurationSeconds;
+          updateDisplay();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      clearInterval(interval);
+      interval = null;
+      progressRing.classList.remove("running");
+      customPanel.classList.remove("dim");
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      remainingSeconds = baseDurationSeconds;
+      updateDisplay();
+    }
+
+    function setCustomTimer() {
+      const minutes = Number(document.getElementById("minutesInput").value);
+
+      if (!minutes || minutes < 1 || minutes > 60) {
+        alert("Please enter a number between 1 and 60");
+        return;
+      }
+
+      goBtn.classList.add("pulse");
+      setTimeout(() => goBtn.classList.remove("pulse"), 400);
+
+      baseDurationSeconds = minutes * 60;
+      remainingSeconds = baseDurationSeconds;
+      resetTimer();
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>
